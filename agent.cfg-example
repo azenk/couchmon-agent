@@ -1,0 +1,3 @@
+[Server]
+url = http://couchmon-server.example.tld:5984
+db = db-name
