@@ -4,6 +4,46 @@ import couchdb.client
 import uuid
 import time
 
+
+class CouchmonRecord(couchdb.client.Document):
+
+	_type = None
+	_keyfields = []
+
+	def __init__(self):
+		couchdb.client.Document.__init__(self)
+		self['type'] = self.type
+
+	@property
+	def type(self):
+		return self._type
+
+	@type.setter
+	def type(self, value):
+		self._type = value
+
+	@property
+	def keyfields(self):
+		return self._keyfields
+
+	@keyfields.setter
+	def keyfields(self, value):
+		self._keyfields = value
+
+	@staticmethod
+	def record_query(db, record):
+		if isinstance(record,CouchmonRecord):
+			query_conds = " && ".join(["doc.type == '{0}'".format(record.type)] +
+																map(lambda x: "doc.{0} == '{1}'".format(x,record[x]),record.keyfields))
+			query_func = "function(doc){{if ({0}){{emit(doc._id,doc)}}}};".format(query_conds)
+			print(query_func)
+			result = db.query(map_fun=query_func)
+			if result.total_rows == 1:
+				row = result.rows[0]
+				return row.key
+			else:
+				raise Exception("Too many records returned")
+
 class DocumentQueue(object):
 	_queue_notifier = Event()
 	_queue = []
@@ -13,8 +53,12 @@ class DocumentQueue(object):
 		pass
 
 	def enqueue(self, doc):
-		doc_id = uuid.uuid4().hex
-		doc["_id"] = doc_id
+		if "_id" not in doc:
+			doc_id = uuid.uuid4().hex
+			doc["_id"] = doc_id
+		else:
+			doc_id = doc["_id"]
+
 		DocumentQueue._queue_lock.acquire()
 		DocumentQueue._queue.append(doc)
 		DocumentQueue._queue_lock.release()
@@ -53,10 +97,11 @@ class ReportingThread(Thread):
 				self._doc_queue.wait(5)
 
 class MonitoringThread(Thread):
-	def __init__(self, interval=60):
+	def __init__(self, interval=60, db=None):
 		Thread.__init__(self)
 		self._doc_queue = DocumentQueue()
 		self._interval = interval
+		self._db = db
 
 	@property
 	def interval(self):

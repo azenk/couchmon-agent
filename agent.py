@@ -2,10 +2,10 @@ __author__ = 'azenk'
 
 import couchdb.client
 import ConfigParser
-import couchmon
+import couchmon, couchmon.record
 from datetime import datetime
 import time
-
+import socket
 
 class AgentConfigParser(ConfigParser.SafeConfigParser):
 
@@ -26,14 +26,34 @@ class TestMonitoringThread(couchmon.MonitoringThread):
 		while True:
 			t = datetime.now()
 			print(self.report({"time":"{0}".format(t)}))
-			time.sleep(5)
+			time.sleep(self.interval)
+
+
+class HostHeartBeatThread(couchmon.MonitoringThread):
+
+	def run(self):
+		# find/create doc for this host.  Key off of fqdn for now.  Maybe write doc_id to file?
+		h = couchmon.record.Host()
+		h["hostname"] = socket.getfqdn()
+		try:
+			doc_id = couchmon.CouchmonRecord.record_query(self._db, h)
+			h["_id"] = doc_id
+		except Exception, e:
+			print(e)
+			host_id = self.report(h)
+			h["_id"] = host_id
+			pass
+		while True:
+			h["last_seen"] = "{0}".format(datetime.now())
+			#print(h)
+			self.report(h)
+			time.sleep(self.interval)
 
 def main():
 	cp = AgentConfigParser()
 	cp.read('agent.cfg')
 	server_url = cp.get_or_default('Server','url','http://localhost:5984')
 	db_name = cp.get_or_default('Server','db','python-tests')
-
 	server = couchdb.client.Server(server_url)
 	if db_name not in server:
 		db = server.create(db_name)
@@ -43,7 +63,8 @@ def main():
 	rt = couchmon.ReportingThread(db)
 	rt.start()
 
-	tm = TestMonitoringThread()
+	tm = HostHeartBeatThread(interval=15,db=db)
+	tm.interval = 15
 	tm.start()
 
 	tm.join()
