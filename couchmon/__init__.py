@@ -3,6 +3,8 @@ from threading import Thread, Event, Lock
 import couchdb.client
 import uuid
 import time
+import signal
+import sys
 
 
 class CouchmonRecord(couchdb.client.Document):
@@ -84,12 +86,17 @@ class DocumentQueue(object):
 
 class ReportingThread(Thread):
 	def __init__(self, couchmon_db):
-				Thread.__init__(self)
-				self._db = couchmon_db
-				self._doc_queue = DocumentQueue()
+		Thread.__init__(self)
+		self._db = couchmon_db
+		self._doc_queue = DocumentQueue()
+		self._interrupt = False
+
+		def signal_handler(signal, frame):
+				self._interrupt = True
+		signal.signal(signal.SIGINT, signal_handler)
 
 	def run(self):
-		while True:
+		while not self._interrupt:
 			try:
 				doc = self._doc_queue.dequeue()
 				self._db.save(doc)
@@ -102,6 +109,11 @@ class MonitoringThread(Thread):
 		self._doc_queue = DocumentQueue()
 		self._interval = interval
 		self._db = db
+		self._interrupt = False
+
+		def signal_handler(signal, frame):
+			self._interrupt = True
+		signal.signal(signal.SIGINT, signal_handler)
 
 	@property
 	def interval(self):
@@ -112,7 +124,7 @@ class MonitoringThread(Thread):
 		self._interval = value
 
 	def run(self):
-		while True:
+		while not self._interrupt:
 			# Do some work
 			doc_id = self.report({"Some key":"Some data"})
 			time.sleep(self.interval)

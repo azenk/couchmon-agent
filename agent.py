@@ -44,7 +44,7 @@ class HostHeartBeatThread(couchmon.MonitoringThread):
 			host_id = self.report(h)
 			h["_id"] = host_id
 			pass
-		while True:
+		while not self._interrupt:
 			h["last_seen"] = "{0}".format(datetime.now())
 			#print(h)
 			self.report(h)
