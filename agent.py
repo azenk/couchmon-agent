@@ -2,6 +2,9 @@ __author__ = 'azenk'
 
 import couchdb.client
 import ConfigParser
+import couchmon
+from datetime import datetime
+import time
 
 
 class AgentConfigParser(ConfigParser.SafeConfigParser):
@@ -17,13 +20,13 @@ class AgentConfigParser(ConfigParser.SafeConfigParser):
 		return value
 
 
-class Person(couchdb.client.Document):
+class TestMonitoringThread(couchmon.MonitoringThread):
 
-	def __init__(self,name):
-		couchdb.client.Document.__init__(self)
-		self['type'] = 'Person'
-		self['name'] = name
-
+	def run(self):
+		while True:
+			t = datetime.now()
+			print(self.report({"time":"{0}".format(t)}))
+			time.sleep(5)
 
 def main():
 	cp = AgentConfigParser()
@@ -37,12 +40,14 @@ def main():
 	else:
 		db = server[db_name]
 
-	p = Person('Mary Jane')
-	doc_id, doc_rev = db.save(p)
-	print(p['type'])
-	print(p['name'])
+	rt = couchmon.ReportingThread(db)
+	rt.start()
 
-	del db[doc_id]
+	tm = TestMonitoringThread()
+	tm.start()
+
+	tm.join()
+	rt.join()
 
 if __name__ == "__main__":
 	main()
