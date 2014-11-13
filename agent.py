@@ -36,8 +36,9 @@ class HostHeartBeatThread(couchmon.MonitoringThread):
 		h = couchmon.record.Host()
 		h["hostname"] = socket.getfqdn()
 		try:
-			doc_id = couchmon.CouchmonRecord.record_query(self._db, h)
+			doc_id, doc_rev = couchmon.CouchmonRecord.record_query(self._db, h)
 			h["_id"] = doc_id
+			h["_rev"] = doc_rev
 		except Exception, e:
 			print(e)
 			host_id = self.report(h)
@@ -64,7 +65,6 @@ def main():
 	rt.start()
 
 	tm = HostHeartBeatThread(interval=15,db=db)
-	tm.interval = 15
 	tm.start()
 
 	tm.join()

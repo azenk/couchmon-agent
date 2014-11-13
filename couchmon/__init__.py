@@ -35,12 +35,12 @@ class CouchmonRecord(couchdb.client.Document):
 		if isinstance(record,CouchmonRecord):
 			query_conds = " && ".join(["doc.type == '{0}'".format(record.type)] +
 																map(lambda x: "doc.{0} == '{1}'".format(x,record[x]),record.keyfields))
-			query_func = "function(doc){{if ({0}){{emit(doc._id,doc)}}}};".format(query_conds)
+			query_func = "function(doc){{if ({0}){{emit(doc._id,doc._rev)}}}};".format(query_conds)
 			print(query_func)
 			result = db.query(map_fun=query_func)
 			if result.total_rows == 1:
 				row = result.rows[0]
-				return row.key
+				return row.key, row.value
 			else:
 				raise Exception("Too many records returned")
 
